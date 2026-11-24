@@ -1,0 +1,40 @@
+name: Build archive_nintendo
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Удобно с телефона: можно загрузить в репозиторий один файл project.zip — он сам распакуется
+      - name: Распаковать project.zip (если залит одним файлом)
+        run: |
+          if [ ! -f Makefile ] && [ -f project.zip ]; then
+            command -v unzip >/dev/null || (apt-get update -qq && apt-get install -y -qq unzip)
+            unzip -o -q project.zip
+          fi
+          ls -la
+
+      - name: Установить zlib для Switch
+        run: |
+          (dkp-pacman -Sy --noconfirm switch-zlib || pacman -Sy --noconfirm switch-zlib)
+
+      - name: Собрать .nro
+        run: make -j2
+
+      - name: Собрать папку для SD-карты
+        run: |
+          mkdir -p out/switch/archive_nintendo out/archive_nintendo/torrents
+          cp archive_nintendo.nro out/switch/archive_nintendo/
+          echo "Кладите сюда файлы .torrent" > out/archive_nintendo/torrents/README.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archive_nintendo
+          path: out/
+          if-no-files-found: error
